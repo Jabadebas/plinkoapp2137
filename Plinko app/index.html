@@ -98,7 +98,7 @@
         const DROP_DELAY = 300; 
 
         const ballRadius = 9;
-        let pinRadius = 4.5;
+        const FIXED_PIN_RADIUS = 5.3;          // stała wielkość pinek – taka jak przy 7 rzędach
         let spacingX, spacingY;
         let gravity = 0.24;
         let bounceForce = 2.3;
@@ -151,15 +151,14 @@
             document.getElementById('rowsVal').innerText = rows;
 
             // ──────────────────────────────
-            // Większe odstępy – kluczowa zmiana
-            // Używamy ~92–95% szerokości canvasa na pinezki
+            // Odstępy – maleją przy większej liczbie rzędów
             const usableWidth = canvas.width * 0.92;
-            const bottomRowPins = rows + 2;           // najszerszy rząd: rows + 2 pinek
+            const bottomRowPins = rows + 2;
             spacingX = usableWidth / (bottomRowPins - 1);
-            spacingY = spacingX * 0.78;               // nieco wyższa proporcja dla lepszego wyglądu
+            spacingY = spacingX * 0.78;
 
-            // Rozmiar pinek proporcjonalny, ale z ograniczeniem
-            pinRadius = Math.max(3.8, Math.min(6, spacingX * 0.135));
+            // PINY – stała wielkość niezależnie od rows
+            const pinRadius = FIXED_PIN_RADIUS;
 
             pins = [];
             for (let row = 0; row < rows; row++) {
@@ -175,9 +174,8 @@
                 }
             }
 
-            // ──────────────────────────────
-            // MNOŻNIKI – dokładnie tyle samo co pinek na dole
-            const slotsCount = bottomRowPins;   // <--- NAPRAWA: liczba slotów = liczba pinów w dolnym rzędzie
+            // Mnożniki – liczba slotów = liczba pinów na dole
+            const slotsCount = bottomRowPins;
 
             const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
             const halfSlots = Math.floor(slotsCount / 2);
@@ -192,7 +190,6 @@
             leftSide = leftSide.slice(trimLevels);
 
             multipliers = [...leftSide, 0.2, ...leftSide.reverse()];
-            // Przycinamy dokładnie do slotsCount (na wszelki wypadek)
             if (multipliers.length > slotsCount) {
                 const excess = multipliers.length - slotsCount;
                 const removeEachSide = Math.floor(excess / 2);
@@ -216,11 +213,11 @@
             ctx.fillStyle = "#475569";
             pins.forEach(p => {
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, pinRadius, 0, Math.PI*2);
+                ctx.arc(p.x, p.y, FIXED_PIN_RADIUS, 0, Math.PI*2);
                 ctx.fill();
             });
 
-            const sw = spacingX;                    // szerokość slotu = odstęp między pinami
+            const sw = spacingX;
             const sx = canvas.width / 2 - (multipliers.length * sw) / 2;
 
             multipliers.forEach((m, i) => {
@@ -240,7 +237,7 @@
 
                 pins.forEach(p => {
                     const dist = Math.hypot(b.x - p.x, b.y - p.y);
-                    if (dist < ballRadius + pinRadius + 1) {
+                    if (dist < ballRadius + FIXED_PIN_RADIUS + 1) {
                         const angle = Math.atan2(b.y - p.y, b.x - p.x);
                         b.vx = Math.cos(angle) * bounceForce + (Math.random()-0.5)*0.15;
                         b.vy = Math.sin(angle) * bounceForce - 0.35;
