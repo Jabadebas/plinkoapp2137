@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Plinko Pro - Anti-Cheat Edition</title>
+    <title>Plinko Pro - Final Logic Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background: #020617; color: white; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; touch-action: manipulation; }
@@ -28,16 +28,13 @@
         label { font-size: 10px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
         input[type=range] { width: 90%; cursor: pointer; accent-color: #6366f1; }
         
-        /* Styl przycisku z zabezpieczeniem */
         button#dropBtn { 
             background: #6366f1; border: none; color: white; padding: 12px 60px; 
             font-size: 20px; border-radius: 18px; cursor: pointer; font-weight: 900; 
             box-shadow: 0 4px 0 #4338ca; transition: 0.1s; width: 250px;
         }
         button#dropBtn:active { transform: translateY(2px); box-shadow: 0 0 0 #4338ca; }
-        button#dropBtn:disabled { 
-            background: #334155; box-shadow: none; cursor: not-allowed; opacity: 0.6; 
-        }
+        button#dropBtn:disabled { background: #334155; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
 
         #leaderboard-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; padding: 25px; border-radius: 20px; border: 2px solid #6366f1; z-index: 100; min-width: 300px; }
         .leader-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #334155; }
@@ -100,7 +97,7 @@
         let gameHistory = [];
         let balls = [], pins = [], multipliers = [];
         let lastDropTime = 0;
-        const DROP_DELAY = 300; // Milisekundy przerwy (Anti-Autoclicker)
+        const DROP_DELAY = 300; 
 
         let spacingX = 36, spacingY = 26;
         const ballRadius = 6, pinRadius = 3, gravity = 0.22, bounceForce = 2.0;
@@ -136,9 +133,9 @@
             gameHistory.forEach(val => {
                 const item = document.createElement('div');
                 item.className = 'history-item';
-                if (val >= 10) { item.style.background = '#ef4444'; }
+                if (val >= 10) item.style.background = '#ef4444';
                 else if (val >= 2) { item.style.background = '#f59e0b'; item.style.color = '#020617'; }
-                else if (val >= 1) { item.style.background = '#10b981'; }
+                else if (val >= 1) item.style.background = '#10b981';
                 else { item.style.background = '#334155'; item.style.color = '#94a3b8'; }
                 item.innerText = val + "x";
                 historyListEl.appendChild(item);
@@ -149,18 +146,29 @@
             pins = []; multipliers = [];
             const rCount = parseInt(document.getElementById('rowsSlider').value);
             document.getElementById('rowsVal').innerText = rCount;
+            
             for (let i = 0; i < rCount; i++) {
                 const pinsInRow = i + 3;
                 for (let j = 0; j < pinsInRow; j++) {
                     pins.push({ x: canvas.width / 2 + (j - (pinsInRow - 1) / 2) * spacingX, y: 50 + i * spacingY });
                 }
             }
-            const base = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2, 0.5, 1.2, 2, 5, 10, 41, 110];
-            const slotsCount = rCount + 2;
-            const midBase = 7, midTarget = (slotsCount - 1) / 2;
-            for (let i = 0; i < slotsCount; i++) {
-                multipliers.push(base[Math.round(midBase + (i - midTarget))] || 1.0);
+
+            // DYNAMICZNA LOGIKA MNOŻNIKÓW (SYMERYCZNA)
+            const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
+            const slotsCount = rCount + 2; 
+            const halfSlots = Math.floor(slotsCount / 2);
+
+            let leftSide = [];
+            for (let i = 0; i < halfSlots; i++) {
+                let ratio = i / halfSlots;
+                let index = Math.floor(ratio * (fullPath.length - 1));
+                leftSide.push(fullPath[index]);
             }
+
+            multipliers = [...leftSide, 0.2, ...[...leftSide].reverse()];
+            while(multipliers.length > slotsCount) multipliers.splice(halfSlots, 1);
+            
             bottomY = 50 + (rCount - 1) * spacingY + 45;
         }
 
@@ -205,17 +213,13 @@
 
         dropBtn.onclick = () => {
             const now = Date.now();
-            if (now - lastDropTime < DROP_DELAY) return; // Zabezpieczenie logiczne
-
+            if (now - lastDropTime < DROP_DELAY) return; 
             const bet = parseInt(document.getElementById('costSlider').value);
             if (score >= bet) {
                 score -= bet; scoreEl.innerText = score;
                 lastDropTime = now;
-                
-                // Zabezpieczenie fizyczne (blokada przycisku)
                 dropBtn.disabled = true;
                 setTimeout(() => { dropBtn.disabled = false; }, DROP_DELAY);
-
                 balls.push({ x: canvas.width / 2 + (Math.random()-0.5)*2, y: 15, vx: 0, vy: 2, bet: bet });
             }
         };
