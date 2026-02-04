@@ -80,7 +80,6 @@
     </div>
 
     <script>
-        // --- KONFIGURACJA SUPABASE ---
         const SUPABASE_URL = 'https://uwgxdwznochxndodqoqm.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3Z3hkd3pub2NoeG5kb2Rxb3FtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNDAzNzEsImV4cCI6MjA4NTcxNjM3MX0.CZRJziYrNl19oG5fyIzbnBqZBQ9OwQftUB2dkuslo9Q'; 
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -98,51 +97,47 @@
         let lastDropTime = 0;
         const DROP_DELAY = 300; 
 
-        let spacingX = 36, spacingY = 26;
-        const ballRadius = 6, pinRadius = 3, gravity = 0.22, bounceForce = 2.0;
+        const ballRadius = 8;
+        let pinRadius = 4;
+        let spacingX, spacingY;
+        let gravity = 0.24;
+        let bounceForce = 2.2;
+        let bottomY;
 
         document.getElementById('nick-display').innerText = nick;
         scoreEl.innerText = score;
 
         function changeNick() {
             let n = prompt("Twój nick:", nick);
-            if(n) { nick = n.substring(0, 12); localStorage.setItem('plinko_nick', nick); document.getElementById('nick-display').innerText = nick; }
+            if(n) { 
+                nick = n.substring(0, 12); 
+                localStorage.setItem('plinko_nick', nick); 
+                document.getElementById('nick-display').innerText = nick; 
+            }
         }
 
         async function saveScoreToCloud(s) { 
             try { await _supabase.from('leaderboard').insert([{ username: nick, score: s }]); } 
-            catch(e) { console.error("Leaderboard save error:", e); }
+            catch(e) { console.error(e); }
         }
 
         async function toggleLeaders() {
             const m = document.getElementById('leaderboard-modal');
             const l = document.getElementById('leader-list');
             if (m.style.display === "block") { m.style.display = "none"; return; }
-            m.style.display = "block"; 
-            l.innerHTML = "Ładowanie...";
-            try {
-                const { data } = await _supabase.from('leaderboard')
-                    .select('username, score')
-                    .order('score', { ascending: false })
-                    .limit(20);
-                if (data) {
-                    l.innerHTML = "";
-                    const seen = new Set(); 
-                    const top = [];
-                    for(let p of data) { 
-                        const key = p.username.toLowerCase();
-                        if(!seen.has(key)) { 
-                            seen.add(key); 
-                            top.push(p); 
-                        } 
-                        if(top.length === 5) break; 
-                    }
-                    top.forEach((p, i) => { 
-                        l.innerHTML += `<div class="leader-item"><span>${i+1}. ${p.username}</span><b>$${p.score}</b></div>`; 
-                    });
+            m.style.display = "block"; l.innerHTML = "Ładowanie...";
+            const { data } = await _supabase.from('leaderboard').select('username, score').order('score', { ascending: false }).limit(20);
+            if (data) {
+                l.innerHTML = "";
+                const seen = new Set(); const top = [];
+                for(let p of data) { 
+                    if(!seen.has(p.username.toLowerCase())) { 
+                        seen.add(p.username.toLowerCase()); 
+                        top.push(p); 
+                    } 
+                    if(top.length === 5) break; 
                 }
-            } catch(e) {
-                l.innerHTML = "Błąd ładowania";
+                top.forEach((p, i) => { l.innerHTML += `<div class="leader-item"><span>${i+1}. ${p.username}</span><b>$${p.score}</b></div>`; });
             }
         }
 
@@ -156,36 +151,47 @@
                 if (val >= 10) item.style.background = '#ef4444';
                 else if (val >= 2) { item.style.background = '#f59e0b'; item.style.color = '#020617'; }
                 else if (val >= 1) item.style.background = '#10b981';
-                else { item.style.background = '#334155'; item.style.color = 'white'; }
+                else { item.style.background = '#334155'; item.style.color = '#94a3b8'; }
                 item.innerText = val + "x";
                 historyListEl.appendChild(item);
             });
         }
 
-        function setupBoard() {
-            pins = []; multipliers = [];
-            const rCount = parseInt(document.getElementById('rowsSlider').value);
-            document.getElementById('rowsVal').innerText = rCount;
+        function updateSpacingAndPins() {
+            const rows = parseInt(document.getElementById('rowsSlider').value);
             
-            // Generowanie pinezek
-            for (let i = 0; i < rCount; i++) {
+            // Dynamiczne odstępy w zależności od liczby rzędów
+            const baseWidth = canvas.width * 0.85;           // używamy ~85% szerokości canvasa
+            const maxPinsInRow = rows + 2;                   // najszerszy rząd ma rows + 2 pinek
+            
+            spacingX = baseWidth / (maxPinsInRow - 1);
+            spacingY = spacingX * 0.72;                      // proporcja pionowa (możesz dostosować)
+
+            // Ograniczamy maksymalny i minimalny rozmiar pinek
+            pinRadius = Math.max(3.2, Math.min(5.5, spacingX * 0.14));
+
+            // Lekko zmniejszamy grawitację i siłę odbicia przy większej liczbie rzędów
+            gravity = 0.18 + (rows / 15) * 0.12;
+            bounceForce = 2.0 + (rows / 15) * 0.4;
+
+            pins = [];
+            for (let i = 0; i < rows; i++) {
                 const pinsInRow = i + 3;
                 for (let j = 0; j < pinsInRow; j++) {
-                    pins.push({ 
-                        x: canvas.width / 2 + (j - (pinsInRow - 1) / 2) * spacingX, 
-                        y: 50 + i * spacingY 
+                    const offset = (j - (pinsInRow - 1) / 2) * spacingX;
+                    pins.push({
+                        x: canvas.width / 2 + offset,
+                        y: 60 + i * spacingY
                     });
                 }
             }
 
-            // ────────────────────────────────────────────────
-            // NOWA LOGIKA MNOŻNIKÓW – odcina skrajne dołki przy małej liczbie rzędów
+            // Mnożniki – odcinka skrajne przy mniejszej liczbie rzędów
             const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
-            const slotsCount = rCount + 2;
+            const slotsCount = rows + 2;
             const halfSlots = Math.floor(slotsCount / 2);
 
-            // Ile mnożników "wycinasz" z każdej strony (więcej przy mniejszej piramidzie)
-            const trimLevels = Math.max(0, 4 - Math.floor(rCount / 4)); // 7→3, 9→2, 11→1, 13→1, 15→0
+            const trimLevels = Math.max(0, 4 - Math.floor(rows / 4));
 
             let leftSide = [];
             for (let i = 0; i < halfSlots; i++) {
@@ -193,73 +199,68 @@
                 let index = Math.floor(ratio * (fullPath.length - 1));
                 leftSide.push(fullPath[index]);
             }
-
-            // Wycinamy skrajne (najwyższe) z lewej i prawej
             leftSide = leftSide.slice(trimLevels);
 
-            // Środek zawsze zostaje
             multipliers = [...leftSide, 0.2, ...leftSide.reverse()];
+            while (multipliers.length > slotsCount) multipliers.splice(halfSlots, 1);
 
-            // Gdyby coś zostało za długie (rzadko)
-            while (multipliers.length > slotsCount) {
-                multipliers.splice(halfSlots, 1);
-            }
-
-            bottomY = 50 + (rCount - 1) * spacingY + 45;
+            bottomY = 60 + (rows - 1) * spacingY + 45;
         }
 
         function updateBetSlider() {
             const slider = document.getElementById('costSlider');
             const maxBet = (score >= 10000) ? score : 500;
             slider.max = maxBet;
-            if (parseInt(slider.value) > maxBet) {
-                slider.value = maxBet;
-            }
+            if (parseInt(slider.value) > maxBet) slider.value = maxBet;
             document.getElementById('costVal').innerText = slider.value;
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Rysowanie pinek
             ctx.fillStyle = "#475569";
-            pins.forEach(p => { 
-                ctx.beginPath(); 
-                ctx.arc(p.x, p.y, pinRadius, 0, Math.PI*2); 
-                ctx.fill(); 
+            pins.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, pinRadius, 0, Math.PI * 2);
+                ctx.fill();
             });
 
+            // Mnożniki na dole
             const sw = spacingX;
             const sx = canvas.width / 2 - (multipliers.length * sw) / 2;
 
             multipliers.forEach((m, i) => {
                 const d = Math.abs(i - (multipliers.length - 1) / 2) / ((multipliers.length - 1) / 2);
-                ctx.fillStyle = `rgb(255, ${Math.floor(255*(1-d))}, ${Math.floor(100*(1-d))})`;
-                ctx.fillRect(sx + i * sw + 1, bottomY, sw - 2, 25);
+                ctx.fillStyle = `rgb(255, ${Math.floor(255 * (1 - d))}, ${Math.floor(100 * (1 - d))})`;
+                ctx.fillRect(sx + i * sw + 2, bottomY, sw - 4, 32);
                 ctx.fillStyle = d > 0.6 ? "white" : "#020617";
-                ctx.font = "bold 10px sans-serif"; 
+                ctx.font = "bold 11px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 18);
+                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 21);
             });
 
+            // Kulki
             balls.forEach((b, idx) => {
-                b.vy += gravity; 
-                b.x += b.vx; 
+                b.vy += gravity;
+                b.x += b.vx;
                 b.y += b.vy;
 
                 pins.forEach(p => {
                     const dist = Math.hypot(b.x - p.x, b.y - p.y);
                     if (dist < ballRadius + pinRadius) {
                         const angle = Math.atan2(b.y - p.y, b.x - p.x);
-                        b.vx = Math.cos(angle) * bounceForce + (Math.random()-0.5)*0.18;
-                        b.vy = Math.sin(angle) * bounceForce - 0.4; // lekki lift żeby mniej wpadało w środek
+                        b.vx = Math.cos(angle) * bounceForce + (Math.random() - 0.5) * 0.18;
+                        b.vy = Math.sin(angle) * bounceForce - 0.3;
                     }
                 });
 
-                ctx.fillStyle = "#fff"; 
-                ctx.beginPath(); 
-                ctx.arc(b.x, b.y, ballRadius, 0, Math.PI*2); 
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, ballRadius, 0, Math.PI * 2);
                 ctx.fill();
 
-                if (b.y > bottomY + 10) {
+                if (b.y > bottomY + 20) {
                     const s = Math.floor((b.x - sx) / sw);
                     if (s >= 0 && s < multipliers.length) {
                         const m = multipliers[s];
@@ -279,28 +280,36 @@
 
         dropBtn.onclick = () => {
             const now = Date.now();
-            if (now - lastDropTime < DROP_DELAY) return; 
+            if (now - lastDropTime < DROP_DELAY) return;
             const bet = parseInt(document.getElementById('costSlider').value);
             if (score >= bet) {
-                score -= bet; 
+                score -= bet;
                 scoreEl.innerText = score;
                 localStorage.setItem('plinko_balance', score);
                 updateBetSlider();
                 lastDropTime = now;
                 dropBtn.disabled = true;
                 setTimeout(() => { dropBtn.disabled = false; }, DROP_DELAY);
-                balls.push({ x: canvas.width / 2 + (Math.random()-0.5)*4, y: 15, vx: 0, vy: 2.2, bet: bet });
+                balls.push({
+                    x: canvas.width / 2 + (Math.random() - 0.5) * 20,
+                    y: 20,
+                    vx: 0,
+                    vy: 2.4,
+                    bet: bet
+                });
             }
         };
 
         document.getElementById('show-leaders').onclick = toggleLeaders;
-        document.getElementById('rowsSlider').oninput = () => { setupBoard(); };
+        document.getElementById('rowsSlider').oninput = () => {
+            updateSpacingAndPins();
+        };
         document.getElementById('costSlider').oninput = (e) => {
             document.getElementById('costVal').innerText = e.target.value;
         };
 
         updateBetSlider();
-        setupBoard(); 
+        updateSpacingAndPins();
         draw();
     </script>
 </body>
