@@ -26,6 +26,7 @@
         .slider-group { background: #1e293b; padding: 8px; border-radius: 16px; flex: 1; text-align: center; border: 1px solid #334155; }
         label { font-size: 10px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
         input[type=range] { width: 90%; cursor: pointer; accent-color: #6366f1; }
+        input[type=range]:disabled { opacity: 0.5; cursor: not-allowed; }
         
         button#dropBtn { 
             background: #6366f1; border: none; color: white; padding: 12px 60px; 
@@ -89,6 +90,7 @@
         const scoreEl = document.getElementById('score');
         const historyListEl = document.getElementById('history-list');
         const dropBtn = document.getElementById('dropBtn');
+        const rowsSlider = document.getElementById('rowsSlider');
         
         let score = parseInt(localStorage.getItem('plinko_balance')) || 1000;
         let nick = localStorage.getItem('plinko_nick') || "Anonim";
@@ -97,12 +99,8 @@
         let lastDropTime = 0;
         const DROP_DELAY = 300; 
 
-        const ballRadius = 9;
-        const FIXED_PIN_RADIUS = 5.3;          // stała wielkość pinek – taka jak przy 7 rzędach
-        let spacingX, spacingY;
-        let gravity = 0.24;
-        let bounceForce = 2.3;
-        let bottomY;
+        let spacingX = 36, spacingY = 26;
+        const ballRadius = 6, pinRadius = 3, gravity = 0.22, bounceForce = 2.0;
 
         document.getElementById('nick-display').innerText = nick;
         scoreEl.innerText = score;
@@ -112,9 +110,7 @@
             if(n) { nick = n.substring(0, 12); localStorage.setItem('plinko_nick', nick); document.getElementById('nick-display').innerText = nick; }
         }
 
-        async function saveScoreToCloud(s) { 
-            try { await _supabase.from('leaderboard').insert([{ username: nick, score: s }]); } catch(e) {}
-        }
+        async function saveScoreToCloud(s) { try { await _supabase.from('leaderboard').insert([{ username: nick, score: s }]); } catch(e) {} }
 
         async function toggleLeaders() {
             const m = document.getElementById('leaderboard-modal');
@@ -146,40 +142,21 @@
             });
         }
 
-        function updateBoard() {
-            const rows = parseInt(document.getElementById('rowsSlider').value);
-            document.getElementById('rowsVal').innerText = rows;
-
-            // ──────────────────────────────
-            // Odstępy – maleją przy większej liczbie rzędów
-            const usableWidth = canvas.width * 0.92;
-            const bottomRowPins = rows + 2;
-            spacingX = usableWidth / (bottomRowPins - 1);
-            spacingY = spacingX * 0.78;
-
-            // PINY – stała wielkość niezależnie od rows
-            const pinRadius = FIXED_PIN_RADIUS;
-
-            pins = [];
-            for (let row = 0; row < rows; row++) {
-                const pinsInThisRow = row + 3;
-                const rowWidth = (pinsInThisRow - 1) * spacingX;
-                const startX = (canvas.width - rowWidth) / 2;
-
-                for (let col = 0; col < pinsInThisRow; col++) {
-                    pins.push({
-                        x: startX + col * spacingX,
-                        y: 60 + row * spacingY
-                    });
+        function setupBoard() {
+            pins = []; multipliers = [];
+            const rCount = parseInt(rowsSlider.value);
+            document.getElementById('rowsVal').innerText = rCount;
+            
+            for (let i = 0; i < rCount; i++) {
+                const pinsInRow = i + 3;
+                for (let j = 0; j < pinsInRow; j++) {
+                    pins.push({ x: canvas.width / 2 + (j - (pinsInRow - 1) / 2) * spacingX, y: 50 + i * spacingY });
                 }
             }
 
-            // Mnożniki – liczba slotów = liczba pinów na dole
-            const slotsCount = bottomRowPins;
-
             const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
+            const slotsCount = rCount + 2; 
             const halfSlots = Math.floor(slotsCount / 2);
-            const trimLevels = Math.max(0, 4 - Math.floor(rows / 4));
 
             let leftSide = [];
             for (let i = 0; i < halfSlots; i++) {
@@ -187,108 +164,96 @@
                 let index = Math.floor(ratio * (fullPath.length - 1));
                 leftSide.push(fullPath[index]);
             }
-            leftSide = leftSide.slice(trimLevels);
 
-            multipliers = [...leftSide, 0.2, ...leftSide.reverse()];
-            if (multipliers.length > slotsCount) {
-                const excess = multipliers.length - slotsCount;
-                const removeEachSide = Math.floor(excess / 2);
-                multipliers = multipliers.slice(removeEachSide, multipliers.length - removeEachSide);
-            }
-
-            bottomY = 60 + (rows - 1) * spacingY + 50;
+            multipliers = [...leftSide, 0.2, ...[...leftSide].reverse()];
+            while(multipliers.length > slotsCount) multipliers.splice(halfSlots, 1);
+            
+            bottomY = 50 + (rCount - 1) * spacingY + 45;
         }
 
-        function updateBetSlider() {
+        function updateBetSliderMax() {
             const slider = document.getElementById('costSlider');
             const maxBet = (score >= 10000) ? score : 500;
             slider.max = maxBet;
-            if (parseInt(slider.value) > maxBet) slider.value = maxBet;
-            document.getElementById('costVal').innerText = slider.value;
+            if (parseInt(slider.value) > maxBet) {
+                slider.value = maxBet;
+                document.getElementById('costVal').innerText = slider.value;
+            }
+        }
+
+        function updateRowsSliderState() {
+            // Blokujemy suwak rzędów, gdy leci choć jedna kulka
+            rowsSlider.disabled = balls.length > 0;
         }
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             ctx.fillStyle = "#475569";
-            pins.forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, FIXED_PIN_RADIUS, 0, Math.PI*2);
-                ctx.fill();
-            });
-
-            const sw = spacingX;
-            const sx = canvas.width / 2 - (multipliers.length * sw) / 2;
-
+            pins.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, pinRadius, 0, Math.PI*2); ctx.fill(); });
+            const sw = spacingX, sx = canvas.width / 2 - (multipliers.length * sw) / 2;
             multipliers.forEach((m, i) => {
                 const d = Math.abs(i - (multipliers.length - 1) / 2) / ((multipliers.length - 1) / 2);
                 ctx.fillStyle = `rgb(255, ${Math.floor(255*(1-d))}, ${Math.floor(100*(1-d))})`;
-                ctx.fillRect(sx + i * sw + 2, bottomY, sw - 4, 36);
-                ctx.fillStyle = d > 0.65 ? "white" : "#020617";
-                ctx.font = "bold 12px sans-serif";
-                ctx.textAlign = "center";
-                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 24);
+                ctx.fillRect(sx + i * sw + 1, bottomY, sw - 2, 25);
+                ctx.fillStyle = d > 0.6 ? "white" : "#020617";
+                ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
+                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 17);
             });
-
             balls.forEach((b, idx) => {
-                b.vy += gravity;
-                b.x += b.vx;
-                b.y += b.vy;
-
+                b.vy += gravity; b.x += b.vx; b.y += b.vy;
                 pins.forEach(p => {
                     const dist = Math.hypot(b.x - p.x, b.y - p.y);
-                    if (dist < ballRadius + FIXED_PIN_RADIUS + 1) {
+                    if (dist < ballRadius + pinRadius) {
                         const angle = Math.atan2(b.y - p.y, b.x - p.x);
-                        b.vx = Math.cos(angle) * bounceForce + (Math.random()-0.5)*0.15;
-                        b.vy = Math.sin(angle) * bounceForce - 0.35;
+                        b.vx = Math.cos(angle) * bounceForce + (Math.random()-0.5)*0.25;
+                        b.vy = Math.sin(angle) * bounceForce;
                     }
                 });
-
-                ctx.fillStyle = "#ffffff";
-                ctx.beginPath();
-                ctx.arc(b.x, b.y, ballRadius, 0, Math.PI*2);
-                ctx.fill();
-
-                if (b.y > bottomY + 30) {
+                ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(b.x, b.y, ballRadius, 0, Math.PI*2); ctx.fill();
+                if (b.y > bottomY) {
                     const s = Math.floor((b.x - sx) / sw);
                     if (s >= 0 && s < multipliers.length) {
                         const m = multipliers[s];
-                        score += Math.floor(b.bet * m);
-                        scoreEl.innerText = score;
+                        score += Math.floor(b.bet * m); scoreEl.innerText = score;
                         localStorage.setItem('plinko_balance', score);
                         updateHistoryUI(m);
                         if (m >= 10) saveScoreToCloud(score);
-                        updateBetSlider();
+                        updateBetSliderMax();
                     }
                     balls.splice(idx, 1);
                 }
             });
+
+            // Aktualizujemy stan suwaka rzędów przy każdym klatce
+            updateRowsSliderState();
 
             requestAnimationFrame(draw);
         }
 
         dropBtn.onclick = () => {
             const now = Date.now();
-            if (now - lastDropTime < DROP_DELAY) return;
+            if (now - lastDropTime < DROP_DELAY) return; 
             const bet = parseInt(document.getElementById('costSlider').value);
             if (score >= bet) {
-                score -= bet;
-                scoreEl.innerText = score;
+                score -= bet; scoreEl.innerText = score;
                 localStorage.setItem('plinko_balance', score);
-                updateBetSlider();
+                updateBetSliderMax();
                 lastDropTime = now;
                 dropBtn.disabled = true;
-                setTimeout(() => dropBtn.disabled = false, DROP_DELAY);
-                balls.push({ x: canvas.width / 2 + (Math.random()-0.5)*12, y: 25, vx: 0, vy: 2.5, bet });
+                setTimeout(() => { dropBtn.disabled = false; }, DROP_DELAY);
+                balls.push({ x: canvas.width / 2 + (Math.random()-0.5)*2, y: 15, vx: 0, vy: 2, bet: bet });
+                // po dodaniu kulki suwak rzędów zostanie zablokowany przez updateRowsSliderState()
             }
         };
 
         document.getElementById('show-leaders').onclick = toggleLeaders;
-        document.getElementById('rowsSlider').oninput = updateBoard;
-        document.getElementById('costSlider').oninput = e => document.getElementById('costVal').innerText = e.target.value;
+        document.getElementById('rowsSlider').oninput = setupBoard;
+        document.getElementById('costSlider').oninput = (e) => {
+            document.getElementById('costVal').innerText = e.target.value;
+        };
 
-        updateBetSlider();
-        updateBoard();
+        updateBetSliderMax();
+        setupBoard(); 
         draw();
     </script>
 </body>
