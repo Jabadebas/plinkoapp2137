@@ -1,233 +1,233 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Plinko Pro - Final Logic Edition</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        body { background: #020617; color: white; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; touch-action: manipulation; }
-        #game-layout { display: flex; gap: 20px; align-items: flex-start; }
-        #game-container { position: relative; border: 2px solid #1e293b; border-radius: 24px; background: radial-gradient(circle at center, #0f172a 0%, #020617 100%); box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
-        canvas { display: block; max-width: 100%; height: auto; }
-        
-        /* Styl Historii */
-        #history-panel { background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 20px; width: 100px; height: 580px; display: flex; flex-direction: column; align-items: center; padding: 10px; overflow: hidden; }
-        .history-title { font-size: 10px; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; font-weight: bold; }
-        #history-list { display: flex; flex-direction: column; gap: 5px; width: 100%; }
-        .history-item { padding: 6px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 13px; animation: slideIn 0.2s ease-out; }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Plinko Pro - Final Logic Edition</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #020617; color: white; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; overflow: hidden; touch-action: manipulation; }
+        #game-layout { display: flex; gap: 20px; align-items: flex-start; }
+        #game-container { position: relative; border: 2px solid #1e293b; border-radius: 24px; background: radial-gradient(circle at center, #0f172a 0%, #020617 100%); box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+        canvas { display: block; max-width: 100%; height: auto; }
+        
+        /* Styl Historii */
+        #history-panel { background: rgba(30, 41, 59, 0.5); border: 1px solid #334155; border-radius: 20px; width: 100px; height: 580px; display: flex; flex-direction: column; align-items: center; padding: 10px; overflow: hidden; }
+        .history-title { font-size: 10px; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; font-weight: bold; }
+        #history-list { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+        .history-item { padding: 6px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 13px; animation: slideIn 0.2s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
 
-        .ui-panel { margin-bottom: 10px; background: rgba(15, 23, 42, 0.9); padding: 10px 25px; border-radius: 50px; border: 1px solid #334155; backdrop-filter: blur(10px); display: flex; gap: 15px; align-items: center; }
-        .stats { font-size: 20px; font-weight: 900; color: #10b981; }
-        .user-nick { font-size: 14px; color: #94a3b8; cursor: pointer; text-decoration: underline; }
-        
-        .controls { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; max-width: 600px; }
-        .sliders { display: flex; gap: 10px; width: 90%; }
-        .slider-group { background: #1e293b; padding: 8px; border-radius: 16px; flex: 1; text-align: center; border: 1px solid #334155; }
-        label { font-size: 10px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
-        input[type=range] { width: 90%; cursor: pointer; accent-color: #6366f1; }
-        
-        button#dropBtn { 
-            background: #6366f1; border: none; color: white; padding: 12px 60px; 
-            font-size: 20px; border-radius: 18px; cursor: pointer; font-weight: 900; 
-            box-shadow: 0 4px 0 #4338ca; transition: 0.1s; width: 250px;
-        }
-        button#dropBtn:active { transform: translateY(2px); box-shadow: 0 0 0 #4338ca; }
-        button#dropBtn:disabled { background: #334155; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
+        .ui-panel { margin-bottom: 10px; background: rgba(15, 23, 42, 0.9); padding: 10px 25px; border-radius: 50px; border: 1px solid #334155; backdrop-filter: blur(10px); display: flex; gap: 15px; align-items: center; }
+        .stats { font-size: 20px; font-weight: 900; color: #10b981; }
+        .user-nick { font-size: 14px; color: #94a3b8; cursor: pointer; text-decoration: underline; }
+        
+        .controls { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; max-width: 600px; }
+        .sliders { display: flex; gap: 10px; width: 90%; }
+        .slider-group { background: #1e293b; padding: 8px; border-radius: 16px; flex: 1; text-align: center; border: 1px solid #334155; }
+        label { font-size: 10px; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 4px; }
+        input[type=range] { width: 90%; cursor: pointer; accent-color: #6366f1; }
+        
+        button#dropBtn { 
+            background: #6366f1; border: none; color: white; padding: 12px 60px; 
+            font-size: 20px; border-radius: 18px; cursor: pointer; font-weight: 900; 
+            box-shadow: 0 4px 0 #4338ca; transition: 0.1s; width: 250px;
+        }
+        button#dropBtn:active { transform: translateY(2px); box-shadow: 0 0 0 #4338ca; }
+        button#dropBtn:disabled { background: #334155; box-shadow: none; cursor: not-allowed; opacity: 0.6; }
 
-        #leaderboard-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; padding: 25px; border-radius: 20px; border: 2px solid #6366f1; z-index: 100; min-width: 300px; }
-        .leader-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #334155; }
-        .close-btn { background: #ef4444; color: white; border: none; padding: 10px; border-radius: 10px; width: 100%; margin-top: 15px; cursor: pointer; }
-    </style>
+        #leaderboard-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e293b; padding: 25px; border-radius: 20px; border: 2px solid #6366f1; z-index: 100; min-width: 300px; }
+        .leader-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #334155; }
+        .close-btn { background: #ef4444; color: white; border: none; padding: 10px; border-radius: 10px; width: 100%; margin-top: 15px; cursor: pointer; }
+    </style>
 </head>
 <body>
 
-    <div class="ui-panel">
-        <div class="user-nick" id="nick-display" onclick="changeNick()">Ustaw Nick</div>
-        <div class="stats">$ <span id="score">1000</span></div>
-        <button id="show-leaders" style="background:none; border:none; cursor:pointer; font-size: 24px;">🏆</button>
-    </div>
-    
-    <div id="game-layout">
-        <div id="game-container">
-            <canvas id="plinkoCanvas" width="700" height="580"></canvas>
-        </div>
-        
-        <div id="history-panel">
-            <div class="history-title">Ostatnie 20</div>
-            <div id="history-list"></div>
-        </div>
-    </div>
+    <div class="ui-panel">
+        <div class="user-nick" id="nick-display" onclick="changeNick()">Ustaw Nick</div>
+        <div class="stats">$ <span id="score">1000</span></div>
+        <button id="show-leaders" style="background:none; border:none; cursor:pointer; font-size: 24px;">🏆</button>
+    </div>
+    
+    <div id="game-layout">
+        <div id="game-container">
+            <canvas id="plinkoCanvas" width="700" height="580"></canvas>
+        </div>
+        
+        <div id="history-panel">
+            <div class="history-title">Ostatnie 20</div>
+            <div id="history-list"></div>
+        </div>
+    </div>
 
-    <div class="controls">
-        <div class="sliders">
-            <div class="slider-group">
-                <label>Bet: <span id="costVal">10</span></label>
-                <input type="range" id="costSlider" min="5" max="500" step="5" value="10">
-            </div>
-            <div class="slider-group">
-                <label>Rows: <span id="rowsVal">15</span></label>
-                <input type="range" id="rowsSlider" min="7" max="15" step="2" value="15">
-            </div>
-        </div>
-        <button id="dropBtn">GRAJ</button>
-    </div>
+    <div class="controls">
+        <div class="sliders">
+            <div class="slider-group">
+                <label>Bet: <span id="costVal">10</span></label>
+                <input type="range" id="costSlider" min="5" max="500" step="5" value="10">
+            </div>
+            <div class="slider-group">
+                <label>Rows: <span id="rowsVal">15</span></label>
+                <input type="range" id="rowsSlider" min="7" max="15" step="2" value="15">
+            </div>
+        </div>
+        <button id="dropBtn">GRAJ</button>
+    </div>
 
-    <div id="leaderboard-modal">
-        <h3 style="text-align: center; color: #6366f1;">TOP 5</h3>
-        <div id="leader-list"></div>
-        <button class="close-btn" onclick="toggleLeaders()">ZAMKNIJ</button>
-    </div>
+    <div id="leaderboard-modal">
+        <h3 style="text-align: center; color: #6366f1;">TOP 5</h3>
+        <div id="leader-list"></div>
+        <button class="close-btn" onclick="toggleLeaders()">ZAMKNIJ</button>
+    </div>
 
-    <script>
-        // --- KONFIGURACJA SUPABASE ---
-        const SUPABASE_URL = 'https://uwgxdwznochxndodqoqm.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3Z3hkd3pub2NoeG5kb2Rxb3FtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNDAzNzEsImV4cCI6MjA4NTcxNjM3MX0.CZRJziYrNl19oG5fyIzbnBqZBQ9OwQftUB2dkuslo9Q'; 
-        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    <script>
+        // --- KONFIGURACJA SUPABASE ---
+        const SUPABASE_URL = 'https://uwgxdwznochxndodqoqm.supabase.co';
+        const SUPABASE_KEY = 'TWÓJ_KLUCZ_ANON_PUBLIC_TUTAJ'; 
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const canvas = document.getElementById('plinkoCanvas');
-        const ctx = canvas.getContext('2d');
-        const scoreEl = document.getElementById('score');
-        const historyListEl = document.getElementById('history-list');
-        const dropBtn = document.getElementById('dropBtn');
-        
-        let score = parseInt(localStorage.getItem('plinko_balance')) || 1000;
-        let nick = localStorage.getItem('plinko_nick') || "Anonim";
-        let gameHistory = [];
-        let balls = [], pins = [], multipliers = [];
-        let lastDropTime = 0;
-        const DROP_DELAY = 300; 
+        const canvas = document.getElementById('plinkoCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const historyListEl = document.getElementById('history-list');
+        const dropBtn = document.getElementById('dropBtn');
+        
+        let score = parseInt(localStorage.getItem('plinko_balance')) || 1000;
+        let nick = localStorage.getItem('plinko_nick') || "Anonim";
+        let gameHistory = [];
+        let balls = [], pins = [], multipliers = [];
+        let lastDropTime = 0;
+        const DROP_DELAY = 300; 
 
-        let spacingX = 36, spacingY = 26;
-        const ballRadius = 6, pinRadius = 3, gravity = 0.22, bounceForce = 2.0;
+        let spacingX = 36, spacingY = 26;
+        const ballRadius = 6, pinRadius = 3, gravity = 0.22, bounceForce = 2.0;
 
-        document.getElementById('nick-display').innerText = nick;
-        scoreEl.innerText = score;
+        document.getElementById('nick-display').innerText = nick;
+        scoreEl.innerText = score;
 
-        function changeNick() {
-            let n = prompt("Twój nick:", nick);
-            if(n) { nick = n.substring(0, 12); localStorage.setItem('plinko_nick', nick); document.getElementById('nick-display').innerText = nick; }
-        }
+        function changeNick() {
+            let n = prompt("Twój nick:", nick);
+            if(n) { nick = n.substring(0, 12); localStorage.setItem('plinko_nick', nick); document.getElementById('nick-display').innerText = nick; }
+        }
 
-        async function saveScoreToCloud(s) { try { await _supabase.from('leaderboard').insert([{ username: nick, score: s }]); } catch(e) {} }
+        async function saveScoreToCloud(s) { try { await _supabase.from('leaderboard').insert([{ username: nick, score: s }]); } catch(e) {} }
 
-        async function toggleLeaders() {
-            const m = document.getElementById('leaderboard-modal');
-            const l = document.getElementById('leader-list');
-            if (m.style.display === "block") { m.style.display = "none"; return; }
-            m.style.display = "block"; l.innerHTML = "Ładowanie...";
-            const { data } = await _supabase.from('leaderboard').select('username, score').order('score', { ascending: false }).limit(20);
-            if (data) {
-                l.innerHTML = "";
-                const seen = new Set(); const top = [];
-                for(let p of data) { if(!seen.has(p.username.toLowerCase())) { seen.add(p.username.toLowerCase()); top.push(p); } if(top.length === 5) break; }
-                top.forEach((p, i) => { l.innerHTML += `<div class="leader-item"><span>${i+1}. ${p.username}</span><b>$${p.score}</b></div>`; });
-            }
-        }
+        async function toggleLeaders() {
+            const m = document.getElementById('leaderboard-modal');
+            const l = document.getElementById('leader-list');
+            if (m.style.display === "block") { m.style.display = "none"; return; }
+            m.style.display = "block"; l.innerHTML = "Ładowanie...";
+            const { data } = await _supabase.from('leaderboard').select('username, score').order('score', { ascending: false }).limit(20);
+            if (data) {
+                l.innerHTML = "";
+                const seen = new Set(); const top = [];
+                for(let p of data) { if(!seen.has(p.username.toLowerCase())) { seen.add(p.username.toLowerCase()); top.push(p); } if(top.length === 5) break; }
+                top.forEach((p, i) => { l.innerHTML += `<div class="leader-item"><span>${i+1}. ${p.username}</span><b>$${p.score}</b></div>`; });
+            }
+        }
 
-        function updateHistoryUI(m) {
-            gameHistory.unshift(m);
-            if (gameHistory.length > 20) gameHistory.pop();
-            historyListEl.innerHTML = "";
-            gameHistory.forEach(val => {
-                const item = document.createElement('div');
-                item.className = 'history-item';
-                if (val >= 10) item.style.background = '#ef4444';
-                else if (val >= 2) { item.style.background = '#f59e0b'; item.style.color = '#020617'; }
-                else if (val >= 1) item.style.background = '#10b981';
-                else { item.style.background = '#334155'; item.style.color = '#94a3b8'; }
-                item.innerText = val + "x";
-                historyListEl.appendChild(item);
-            });
-        }
+        function updateHistoryUI(m) {
+            gameHistory.unshift(m);
+            if (gameHistory.length > 20) gameHistory.pop();
+            historyListEl.innerHTML = "";
+            gameHistory.forEach(val => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                if (val >= 10) item.style.background = '#ef4444';
+                else if (val >= 2) { item.style.background = '#f59e0b'; item.style.color = '#020617'; }
+                else if (val >= 1) item.style.background = '#10b981';
+                else { item.style.background = '#334155'; item.style.color = '#94a3b8'; }
+                item.innerText = val + "x";
+                historyListEl.appendChild(item);
+            });
+        }
 
-        function setupBoard() {
-            pins = []; multipliers = [];
-            const rCount = parseInt(document.getElementById('rowsSlider').value);
-            document.getElementById('rowsVal').innerText = rCount;
-            
-            for (let i = 0; i < rCount; i++) {
-                const pinsInRow = i + 3;
-                for (let j = 0; j < pinsInRow; j++) {
-                    pins.push({ x: canvas.width / 2 + (j - (pinsInRow - 1) / 2) * spacingX, y: 50 + i * spacingY });
-                }
-            }
+        function setupBoard() {
+            pins = []; multipliers = [];
+            const rCount = parseInt(document.getElementById('rowsSlider').value);
+            document.getElementById('rowsVal').innerText = rCount;
+            
+            for (let i = 0; i < rCount; i++) {
+                const pinsInRow = i + 3;
+                for (let j = 0; j < pinsInRow; j++) {
+                    pins.push({ x: canvas.width / 2 + (j - (pinsInRow - 1) / 2) * spacingX, y: 50 + i * spacingY });
+                }
+            }
 
-            // DYNAMICZNA LOGIKA MNOŻNIKÓW (SYMERYCZNA)
-            const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
-            const slotsCount = rCount + 2; 
-            const halfSlots = Math.floor(slotsCount / 2);
+            // DYNAMICZNA LOGIKA MNOŻNIKÓW (SYMERYCZNA)
+            const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
+            const slotsCount = rCount + 2; 
+            const halfSlots = Math.floor(slotsCount / 2);
 
-            let leftSide = [];
-            for (let i = 0; i < halfSlots; i++) {
-                let ratio = i / halfSlots;
-                let index = Math.floor(ratio * (fullPath.length - 1));
-                leftSide.push(fullPath[index]);
-            }
+            let leftSide = [];
+            for (let i = 0; i < halfSlots; i++) {
+                let ratio = i / halfSlots;
+                let index = Math.floor(ratio * (fullPath.length - 1));
+                leftSide.push(fullPath[index]);
+            }
 
-            multipliers = [...leftSide, 0.2, ...[...leftSide].reverse()];
-            while(multipliers.length > slotsCount) multipliers.splice(halfSlots, 1);
-            
-            bottomY = 50 + (rCount - 1) * spacingY + 45;
-        }
+            multipliers = [...leftSide, 0.2, ...[...leftSide].reverse()];
+            while(multipliers.length > slotsCount) multipliers.splice(halfSlots, 1);
+            
+            bottomY = 50 + (rCount - 1) * spacingY + 45;
+        }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#475569";
-            pins.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, pinRadius, 0, Math.PI*2); ctx.fill(); });
-            const sw = spacingX, sx = canvas.width / 2 - (multipliers.length * sw) / 2;
-            multipliers.forEach((m, i) => {
-                const d = Math.abs(i - (multipliers.length - 1) / 2) / ((multipliers.length - 1) / 2);
-                ctx.fillStyle = `rgb(255, ${Math.floor(255*(1-d))}, ${Math.floor(100*(1-d))})`;
-                ctx.fillRect(sx + i * sw + 1, bottomY, sw - 2, 25);
-                ctx.fillStyle = d > 0.6 ? "white" : "#020617";
-                ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
-                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 17);
-            });
-            balls.forEach((b, idx) => {
-                b.vy += gravity; b.x += b.vx; b.y += b.vy;
-                pins.forEach(p => {
-                    const dist = Math.hypot(b.x - p.x, b.y - p.y);
-                    if (dist < ballRadius + pinRadius) {
-                        const angle = Math.atan2(b.y - p.y, b.x - p.x);
-                        b.vx = Math.cos(angle) * bounceForce + (Math.random()-0.5)*0.25;
-                        b.vy = Math.sin(angle) * bounceForce;
-                    }
-                });
-                ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(b.x, b.y, ballRadius, 0, Math.PI*2); ctx.fill();
-                if (b.y > bottomY) {
-                    const s = Math.floor((b.x - sx) / sw);
-                    if (s >= 0 && s < multipliers.length) {
-                        const m = multipliers[s];
-                        score += Math.floor(b.bet * m); scoreEl.innerText = score;
-                        localStorage.setItem('plinko_balance', score);
-                        updateHistoryUI(m);
-                        if (m >= 10) saveScoreToCloud(score);
-                    }
-                    balls.splice(idx, 1);
-                }
-            });
-            requestAnimationFrame(draw);
-        }
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#475569";
+            pins.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, pinRadius, 0, Math.PI*2); ctx.fill(); });
+            const sw = spacingX, sx = canvas.width / 2 - (multipliers.length * sw) / 2;
+            multipliers.forEach((m, i) => {
+                const d = Math.abs(i - (multipliers.length - 1) / 2) / ((multipliers.length - 1) / 2);
+                ctx.fillStyle = `rgb(255, ${Math.floor(255*(1-d))}, ${Math.floor(100*(1-d))})`;
+                ctx.fillRect(sx + i * sw + 1, bottomY, sw - 2, 25);
+                ctx.fillStyle = d > 0.6 ? "white" : "#020617";
+                ctx.font = "bold 9px sans-serif"; ctx.textAlign = "center";
+                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 17);
+            });
+            balls.forEach((b, idx) => {
+                b.vy += gravity; b.x += b.vx; b.y += b.vy;
+                pins.forEach(p => {
+                    const dist = Math.hypot(b.x - p.x, b.y - p.y);
+                    if (dist < ballRadius + pinRadius) {
+                        const angle = Math.atan2(b.y - p.y, b.x - p.x);
+                        b.vx = Math.cos(angle) * bounceForce + (Math.random()-0.5)*0.25;
+                        b.vy = Math.sin(angle) * bounceForce;
+                    }
+                });
+                ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(b.x, b.y, ballRadius, 0, Math.PI*2); ctx.fill();
+                if (b.y > bottomY) {
+                    const s = Math.floor((b.x - sx) / sw);
+                    if (s >= 0 && s < multipliers.length) {
+                        const m = multipliers[s];
+                        score += Math.floor(b.bet * m); scoreEl.innerText = score;
+                        localStorage.setItem('plinko_balance', score);
+                        updateHistoryUI(m);
+                        if (m >= 10) saveScoreToCloud(score);
+                    }
+                    balls.splice(idx, 1);
+                }
+            });
+            requestAnimationFrame(draw);
+        }
 
-        dropBtn.onclick = () => {
-            const now = Date.now();
-            if (now - lastDropTime < DROP_DELAY) return; 
-            const bet = parseInt(document.getElementById('costSlider').value);
-            if (score >= bet) {
-                score -= bet; scoreEl.innerText = score;
-                lastDropTime = now;
-                dropBtn.disabled = true;
-                setTimeout(() => { dropBtn.disabled = false; }, DROP_DELAY);
-                balls.push({ x: canvas.width / 2 + (Math.random()-0.5)*2, y: 15, vx: 0, vy: 2, bet: bet });
-            }
-        };
+        dropBtn.onclick = () => {
+            const now = Date.now();
+            if (now - lastDropTime < DROP_DELAY) return; 
+            const bet = parseInt(document.getElementById('costSlider').value);
+            if (score >= bet) {
+                score -= bet; scoreEl.innerText = score;
+                lastDropTime = now;
+                dropBtn.disabled = true;
+                setTimeout(() => { dropBtn.disabled = false; }, DROP_DELAY);
+                balls.push({ x: canvas.width / 2 + (Math.random()-0.5)*2, y: 15, vx: 0, vy: 2, bet: bet });
+            }
+        };
 
-        document.getElementById('show-leaders').onclick = toggleLeaders;
-        document.getElementById('rowsSlider').oninput = setupBoard;
-        document.getElementById('costSlider').oninput = (e) => document.getElementById('costVal').innerText = e.target.value;
-        setupBoard(); draw();
-    </script>
+        document.getElementById('show-leaders').onclick = toggleLeaders;
+        document.getElementById('rowsSlider').oninput = setupBoard;
+        document.getElementById('costSlider').oninput = (e) => document.getElementById('costVal').innerText = e.target.value;
+        setupBoard(); draw();
+    </script>
 </body>
 </html>
