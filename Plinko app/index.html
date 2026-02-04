@@ -172,6 +172,16 @@
             bottomY = 50 + (rCount - 1) * spacingY + 45;
         }
 
+        function updateBetSlider() {
+            const slider = document.getElementById('costSlider');
+            const maxBet = (score >= 10000) ? score : 500;
+            slider.max = maxBet;
+            if (parseInt(slider.value) > maxBet) {
+                slider.value = maxBet;
+            }
+            document.getElementById('costVal').innerText = slider.value;
+        }
+
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#475569";
@@ -204,6 +214,7 @@
                         localStorage.setItem('plinko_balance', score);
                         updateHistoryUI(m);
                         if (m >= 10) saveScoreToCloud(score);
+                        updateBetSlider();  // Aktualizacja slidera po zmianie salda
                     }
                     balls.splice(idx, 1);
                 }
@@ -217,6 +228,8 @@
             const bet = parseInt(document.getElementById('costSlider').value);
             if (score >= bet) {
                 score -= bet; scoreEl.innerText = score;
+                localStorage.setItem('plinko_balance', score);
+                updateBetSlider();  // Aktualizacja slidera po odjęciu bet
                 lastDropTime = now;
                 dropBtn.disabled = true;
                 setTimeout(() => { dropBtn.disabled = false; }, DROP_DELAY);
@@ -226,7 +239,11 @@
 
         document.getElementById('show-leaders').onclick = toggleLeaders;
         document.getElementById('rowsSlider').oninput = setupBoard;
-        document.getElementById('costSlider').oninput = (e) => document.getElementById('costVal').innerText = e.target.value;
+        document.getElementById('costSlider').oninput = (e) => {
+            document.getElementById('costVal').innerText = e.target.value;
+        };
+
+        updateBetSlider();  // Inicjalna aktualizacja slidera
         setupBoard(); draw();
     </script>
 </body>
