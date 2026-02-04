@@ -1,0 +1,10 @@
+{
+  "short_name": "PlinkoPro",
+  "name": "Plinko Professional App",
+  "start_url": "./index.html",
+  "background_color": "#020617",
+  "display": "standalone",
+  "scope": "./",
+  "theme_color": "#6366f1",
+  "description": "Profesjonalna gra Plinko bez ikon."
+}
