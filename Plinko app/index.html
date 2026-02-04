@@ -97,11 +97,11 @@
         let lastDropTime = 0;
         const DROP_DELAY = 300; 
 
-        const ballRadius = 8;
-        let pinRadius = 4;
+        const ballRadius = 9;
+        let pinRadius = 4.5;
         let spacingX, spacingY;
         let gravity = 0.24;
-        let bounceForce = 2.2;
+        let bounceForce = 2.3;
         let bottomY;
 
         document.getElementById('nick-display').innerText = nick;
@@ -109,16 +109,11 @@
 
         function changeNick() {
             let n = prompt("Twój nick:", nick);
-            if(n) { 
-                nick = n.substring(0, 12); 
-                localStorage.setItem('plinko_nick', nick); 
-                document.getElementById('nick-display').innerText = nick; 
-            }
+            if(n) { nick = n.substring(0, 12); localStorage.setItem('plinko_nick', nick); document.getElementById('nick-display').innerText = nick; }
         }
 
         async function saveScoreToCloud(s) { 
-            try { await _supabase.from('leaderboard').insert([{ username: nick, score: s }]); } 
-            catch(e) { console.error(e); }
+            try { await _supabase.from('leaderboard').insert([{ username: nick, score: s }]); } catch(e) {}
         }
 
         async function toggleLeaders() {
@@ -130,13 +125,7 @@
             if (data) {
                 l.innerHTML = "";
                 const seen = new Set(); const top = [];
-                for(let p of data) { 
-                    if(!seen.has(p.username.toLowerCase())) { 
-                        seen.add(p.username.toLowerCase()); 
-                        top.push(p); 
-                    } 
-                    if(top.length === 5) break; 
-                }
+                for(let p of data) { if(!seen.has(p.username.toLowerCase())) { seen.add(p.username.toLowerCase()); top.push(p); } if(top.length === 5) break; }
                 top.forEach((p, i) => { l.innerHTML += `<div class="leader-item"><span>${i+1}. ${p.username}</span><b>$${p.score}</b></div>`; });
             }
         }
@@ -157,40 +146,41 @@
             });
         }
 
-        function updateSpacingAndPins() {
+        function updateBoard() {
             const rows = parseInt(document.getElementById('rowsSlider').value);
-            
-            // Dynamiczne odstępy w zależności od liczby rzędów
-            const baseWidth = canvas.width * 0.85;           // używamy ~85% szerokości canvasa
-            const maxPinsInRow = rows + 2;                   // najszerszy rząd ma rows + 2 pinek
-            
-            spacingX = baseWidth / (maxPinsInRow - 1);
-            spacingY = spacingX * 0.72;                      // proporcja pionowa (możesz dostosować)
+            document.getElementById('rowsVal').innerText = rows;
 
-            // Ograniczamy maksymalny i minimalny rozmiar pinek
-            pinRadius = Math.max(3.2, Math.min(5.5, spacingX * 0.14));
+            // ──────────────────────────────
+            // Większe odstępy – kluczowa zmiana
+            // Używamy ~92–95% szerokości canvasa na pinezki
+            const usableWidth = canvas.width * 0.92;
+            const bottomRowPins = rows + 2;           // najszerszy rząd: rows + 2 pinek
+            spacingX = usableWidth / (bottomRowPins - 1);
+            spacingY = spacingX * 0.78;               // nieco wyższa proporcja dla lepszego wyglądu
 
-            // Lekko zmniejszamy grawitację i siłę odbicia przy większej liczbie rzędów
-            gravity = 0.18 + (rows / 15) * 0.12;
-            bounceForce = 2.0 + (rows / 15) * 0.4;
+            // Rozmiar pinek proporcjonalny, ale z ograniczeniem
+            pinRadius = Math.max(3.8, Math.min(6, spacingX * 0.135));
 
             pins = [];
-            for (let i = 0; i < rows; i++) {
-                const pinsInRow = i + 3;
-                for (let j = 0; j < pinsInRow; j++) {
-                    const offset = (j - (pinsInRow - 1) / 2) * spacingX;
+            for (let row = 0; row < rows; row++) {
+                const pinsInThisRow = row + 3;
+                const rowWidth = (pinsInThisRow - 1) * spacingX;
+                const startX = (canvas.width - rowWidth) / 2;
+
+                for (let col = 0; col < pinsInThisRow; col++) {
                     pins.push({
-                        x: canvas.width / 2 + offset,
-                        y: 60 + i * spacingY
+                        x: startX + col * spacingX,
+                        y: 60 + row * spacingY
                     });
                 }
             }
 
-            // Mnożniki – odcinka skrajne przy mniejszej liczbie rzędów
-            const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
-            const slotsCount = rows + 2;
-            const halfSlots = Math.floor(slotsCount / 2);
+            // ──────────────────────────────
+            // MNOŻNIKI – dokładnie tyle samo co pinek na dole
+            const slotsCount = bottomRowPins;   // <--- NAPRAWA: liczba slotów = liczba pinów w dolnym rzędzie
 
+            const fullPath = [110, 41, 10, 5, 2, 1.2, 0.5, 0.2];
+            const halfSlots = Math.floor(slotsCount / 2);
             const trimLevels = Math.max(0, 4 - Math.floor(rows / 4));
 
             let leftSide = [];
@@ -202,9 +192,14 @@
             leftSide = leftSide.slice(trimLevels);
 
             multipliers = [...leftSide, 0.2, ...leftSide.reverse()];
-            while (multipliers.length > slotsCount) multipliers.splice(halfSlots, 1);
+            // Przycinamy dokładnie do slotsCount (na wszelki wypadek)
+            if (multipliers.length > slotsCount) {
+                const excess = multipliers.length - slotsCount;
+                const removeEachSide = Math.floor(excess / 2);
+                multipliers = multipliers.slice(removeEachSide, multipliers.length - removeEachSide);
+            }
 
-            bottomY = 60 + (rows - 1) * spacingY + 45;
+            bottomY = 60 + (rows - 1) * spacingY + 50;
         }
 
         function updateBetSlider() {
@@ -218,29 +213,26 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Rysowanie pinek
             ctx.fillStyle = "#475569";
             pins.forEach(p => {
                 ctx.beginPath();
-                ctx.arc(p.x, p.y, pinRadius, 0, Math.PI * 2);
+                ctx.arc(p.x, p.y, pinRadius, 0, Math.PI*2);
                 ctx.fill();
             });
 
-            // Mnożniki na dole
-            const sw = spacingX;
+            const sw = spacingX;                    // szerokość slotu = odstęp między pinami
             const sx = canvas.width / 2 - (multipliers.length * sw) / 2;
 
             multipliers.forEach((m, i) => {
                 const d = Math.abs(i - (multipliers.length - 1) / 2) / ((multipliers.length - 1) / 2);
-                ctx.fillStyle = `rgb(255, ${Math.floor(255 * (1 - d))}, ${Math.floor(100 * (1 - d))})`;
-                ctx.fillRect(sx + i * sw + 2, bottomY, sw - 4, 32);
-                ctx.fillStyle = d > 0.6 ? "white" : "#020617";
-                ctx.font = "bold 11px sans-serif";
+                ctx.fillStyle = `rgb(255, ${Math.floor(255*(1-d))}, ${Math.floor(100*(1-d))})`;
+                ctx.fillRect(sx + i * sw + 2, bottomY, sw - 4, 36);
+                ctx.fillStyle = d > 0.65 ? "white" : "#020617";
+                ctx.font = "bold 12px sans-serif";
                 ctx.textAlign = "center";
-                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 21);
+                ctx.fillText(m + "x", sx + i * sw + sw / 2, bottomY + 24);
             });
 
-            // Kulki
             balls.forEach((b, idx) => {
                 b.vy += gravity;
                 b.x += b.vx;
@@ -248,19 +240,19 @@
 
                 pins.forEach(p => {
                     const dist = Math.hypot(b.x - p.x, b.y - p.y);
-                    if (dist < ballRadius + pinRadius) {
+                    if (dist < ballRadius + pinRadius + 1) {
                         const angle = Math.atan2(b.y - p.y, b.x - p.x);
-                        b.vx = Math.cos(angle) * bounceForce + (Math.random() - 0.5) * 0.18;
-                        b.vy = Math.sin(angle) * bounceForce - 0.3;
+                        b.vx = Math.cos(angle) * bounceForce + (Math.random()-0.5)*0.15;
+                        b.vy = Math.sin(angle) * bounceForce - 0.35;
                     }
                 });
 
                 ctx.fillStyle = "#ffffff";
                 ctx.beginPath();
-                ctx.arc(b.x, b.y, ballRadius, 0, Math.PI * 2);
+                ctx.arc(b.x, b.y, ballRadius, 0, Math.PI*2);
                 ctx.fill();
 
-                if (b.y > bottomY + 20) {
+                if (b.y > bottomY + 30) {
                     const s = Math.floor((b.x - sx) / sw);
                     if (s >= 0 && s < multipliers.length) {
                         const m = multipliers[s];
@@ -289,27 +281,17 @@
                 updateBetSlider();
                 lastDropTime = now;
                 dropBtn.disabled = true;
-                setTimeout(() => { dropBtn.disabled = false; }, DROP_DELAY);
-                balls.push({
-                    x: canvas.width / 2 + (Math.random() - 0.5) * 20,
-                    y: 20,
-                    vx: 0,
-                    vy: 2.4,
-                    bet: bet
-                });
+                setTimeout(() => dropBtn.disabled = false, DROP_DELAY);
+                balls.push({ x: canvas.width / 2 + (Math.random()-0.5)*12, y: 25, vx: 0, vy: 2.5, bet });
             }
         };
 
         document.getElementById('show-leaders').onclick = toggleLeaders;
-        document.getElementById('rowsSlider').oninput = () => {
-            updateSpacingAndPins();
-        };
-        document.getElementById('costSlider').oninput = (e) => {
-            document.getElementById('costVal').innerText = e.target.value;
-        };
+        document.getElementById('rowsSlider').oninput = updateBoard;
+        document.getElementById('costSlider').oninput = e => document.getElementById('costVal').innerText = e.target.value;
 
         updateBetSlider();
-        updateSpacingAndPins();
+        updateBoard();
         draw();
     </script>
 </body>
